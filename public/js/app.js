@@ -46,7 +46,7 @@ T.authorize = function(){
     expiration: "never",
     persist: "true",
     success: function() { T.onAuthorizeSuccessful(); },
-    error: function() { T.onFailedAuthorization(); },
+    error: function() { T.error(); },
   });
 };
 
@@ -55,18 +55,17 @@ T.onAuthorizeSuccessful = function() {
   return T.getBoards();
 };
 
-T.onFailedAuthorization = function() {
-  return console.error("Authorization failed.");
+T.error = function(data) {
+  var message = data ? data : "Authorization failed";
+  return console.error(message);
 };
 
 T.getBoards = function(){
-  return Trello.get("/members/me/boards?filter=open").done(function(data){
+  return Trello.get("/members/me/boards?filter=open", function(data) {
     return data.forEach(function(board) {
       $(".boards").prepend("<option value='"+ board.id +"'>"+ board.name +"</option>");
     });
-  }).fail(function(data) {
-    return console.error(data);
-  });
+  }, T.error);
 };
 
 T.duplicateBoard = function(){
@@ -81,31 +80,31 @@ T.duplicateBoard = function(){
 
   if (newBoard === 'yes') {
     $(".message").text("Duplicating board...");
-    return Trello.post("/boards", {
+    var data = {
       name: name,
       idBoardSource: idBoardSource
-    }).done(function(data){
+    };
+
+    return Trello.post("/boards", data, function(data) {
       $(".message").text("Board data recieved.");
       return T.moveCards(data.id, dayDifference);
-    }).fail(function(data){
-      return console.error(data);
-    });
+    }, T.error);
+
   } else {
     $(".message").text("Fetching board...");
-    return Trello.get('/boards/' + idBoardSource)
-    .done(function(data) {
+
+    return Trello.get('/boards/' + idBoardSource, function(data) {
       $(".message").text("Board data recieved.");
       return T.moveCards(data.id, dayDifference);
-    }).fail(function(data){
-      return console.error(data);
-    });
+    }, T.error);
+
   }
 };
 
 T.moveCards = function(id, dayDifference){
   $(".message").text("Fetching cards.");
 
-  Trello.get("/boards/"+id+"/cards").done(function(data) {
+  Trello.get("/boards/"+id+"/cards", function(data) {
     var numberOfCards = data.length;
     $(".message").text(numberOfCards + " cards found");
 
@@ -117,12 +116,10 @@ T.moveCards = function(id, dayDifference){
 
         if (card.due) {
           var newDate = T.createNewDate(card.due, dayDifference);
-          Trello.put("/cards/"+card.id+"/due", { value: newDate }).done(function(data) {
+          Trello.put("/cards/"+card.id+"/due", { value: newDate }, function(data) {
             $(".message").text(numberOfCards + " cards remaining");
             if (numberOfCards === 0) return $(".message").text("Complete!");
-          }).fail(function(data){
-            return console.error(data);
-          });
+          }, T.error);
         }
       }, 100*index);
     });
